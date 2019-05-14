@@ -1,0 +1,204 @@
+---
+title: "Predict Forest Fire Burn Area"
+output: html_document
+---
+
+## Setup
+```{r}
+# load libraries
+library(tidyverse)
+library(GGally)
+library(caret)
+
+# set seed to make sure that you get identical result each time running the code
+set.seed(1234)
+
+# read dataset
+ff = read.delim("forestfires.tsv", header = TRUE, sep = "\t")
+
+```
+## Explore the data
+```{r}
+# get a high-level view of the dataset
+# there are 517 observations and 13 variables
+glimpse(ff)
+summary(ff)
+str(ff)
+
+# check the status of missing value in the datasets
+colSums(is.na(ff)) # the data is very clean as there are no missing values
+
+# take a look at the distribution of predict variable (also our target variable: the burned area)
+ggplot(ff, aes(x = area)) +geom_histogram()
+
+# we can see from the graph that burn area is highly screwd with lots of 0 values
+# log tranform the burn area to reduce skewness
+ff$log_area = log10(ff$area + 1)
+
+ggplot(ff, aes(x = log_area)) + geom_histogram()
+
+# as we filtered out the burn areas below zero, the outcome variable appeared to be more normally distributed
+ggplot(filter(ff, area >0), aes = (x = area + 1))
+              + geom_histogram() 
+              + scale_x_log10("Burn Area (log10)", breaks = c(1, 10, 100, 1000))
+
+# explore the relationship between burn are and park location
+burn_coord = ff %>% group_by(X, Y) %>% summarize(area_mean = mean(area))
+
+ggplot(burn_coord, aes(x = factor(X), y = factor(Y),
+       fill = area_mean)) + geom_tile() + scale_fill_gradient2()
+
+# explore if forest fire has seasonality
+# make the month in order
+ff$month = factor(ff$month, levels = c("jan", "feb", "mar", "apr", "may", "jun", 
+                                       "jul", "aug", "sep", "oct", "nov", "dec"))
+ggplot(ff, aes(x = RH, y = area)) + geom_point() 
+                                  + geom_smooth(method = "lm")
+                                  + facet_wrap(~month) + scale_y_log10()
+
+# using ggpairs to explore variables corelation
+ggpairs(select(ff, temp, RH, wind, log_area))
+```
+
+When I explore the data
+(1) It seems that weekends do cause a larger burn area
+(2) Burn area seems to have a seasonally variation 
+```{r}
+# feature engineering
+# plot the relationship between is_weekend and burn area
+ff1 = filter(ff, log_area > 0)
+
+ggplot(ff1, aes(x = is_weekend, y = log_area)) +
+  geom_point() +
+  geom_boxplot()
+
+# plot the relationship between season and burn area
+ggplot(ff1, aes(x = season, y = log_area)) +
+  geom_point() +
+  geom_boxplot()
+# fires are more likely to happen on weekends because more visitors will come
+# feature 1: whether the day is weekend
+ff$is_weekend = ifelse(ff$day %in% c("sat", "sun"), 1, 0)
+
+ff$is_weekend = factor(ff$is_weekend)
+
+# check the burned area for different months
+summary(ff$month)
+length(ff$month)
+
+# there are big variations between burn areas for each month
+# feature 2: season
+# I convert month to season
+ff$season = 0
+for (i in 1:length(ff$month)) {
+  if (ff$month[i] %in% c("dec", "jan", "feb")) {
+     ff$season[i] = "winter"  
+ } else if (ff$month[i] %in% c("mar", "apr", "may")) {
+     ff$season[i] = "spring" 
+  }else if (ff$month[i] %in% c("jun", "jul", "aug")) {
+     ff$season[i] = "summer"   
+  }else  ff$season[i] = "autumn"
+}
+
+ff$season = as.factor(ff$season)
+
+# convert month, day, and season into binary variables
+month = model.matrix(~month - 1, data = ff)
+day = model.matrix(~day - 1, data = ff)
+season_binary = model.matrix(~season - 1, data = ff)
+
+ff = cbind(ff, month, day, season_binary)
+ff = select(ff, -month, -day, -area)
+
+```
+
+Use createDataPartition to split 80% of the forest fire data into a training set.
+```{r}
+in_train = createDataPartition(y = ff$log_area, p = 0.8, list = FALSE)
+head(in_train)
+is(in_train)
+
+ff_train = ff[in_train, ]
+ff_test = ff[-in_train, ]
+is(ff_train)
+
+dim(ff_train)
+dim(ff_test)
+```
+
+Preprocess the data 
+```{r}
+# pre-process
+# centering, scaling and remove near 0 value
+nearZeroVar(ff, saveMetrics = TRUE)
+ff_preprocess = preProcess(ff_train, method = c("center", "nzv"))
+
+# use predict to apply them to the dataset
+ff_train_proc = predict(ff_preprocess, ff_train)
+ff_test_proc = predict(ff_preprocess, ff_test)
+
+```
+
+Develop a multivariate linear regression model 
+```{r}
+# Forward Method
+# use forward selection by starting with no features and add them sequentially based on a model performance characteristic
+forward_model = train(log_area ~ ., data =ff_train_proc,
+                      method = "leapForward", tuneGrid = expand.grid(nvmax = 1:10), 
+                      trControl = trainControl(method = "cv", number = 10))
+
+plot(forward_model)
+forward_model
+# extract the final model
+plot(forward_model$finalModel, scale = "adjr2")
+
+```
+Ridge Regression
+Address the problem of parameter istability caused by highly correlated features
+shrink the unstable coefficients by imposing an additional penalty parameter on the errors of an ordinary least squares regression
+penalize coefficients that are either too big or too small
+```{r}
+ridge_model = train(log_area ~., data = ff_train_proc,
+                    method = "ridge", tuneGrid = expand.grid(lambda = seq(0, 1, 0.05)),
+                    trControl = trainControl(method = "cv", number = 10))
+
+ridge_model
+plot(ridge_model)
+
+# extract the final model
+plot(ridge_model$finalModel)
+
+```
+
+Lasso (Least Absolute Shrinkage and Selection Operator)
+Address the problem of parameter istability caused by highly correlated features
+Limit the sum of regression coefficient values
+```{r}
+lasso_model = train(log_area ~., data =ff_train_proc,
+                    method = "lasso", tuneGrid = expand.grid(fraction = seq(0, 1, 0.5)),
+                    trControl = trainControl(method = "cv", number = 10))
+lasso_model
+
+plot(lasso_model)
+
+# extract the final model
+plot(lasso_model$finalModel)
+
+# get the model coefficients
+lasso_coefs = predict(lasso_model$finalModel, type = "coef")
+```
+Model Comparison
+```{r}
+# compare dofferent models and select the final one to reoprt
+compare = resamples(list(forward_selection = forward_model, 
+                         ridge_selection = ridge_model, lasso_selection = lasso_model))
+
+# compare RMSE and R-squared
+summary(compare)
+
+# plot the result
+# Lasso model is the final model which has the lowest RMSE (Root Mean Square Error) of 0.6113552
+dotplot(compare)
+
+```
+
