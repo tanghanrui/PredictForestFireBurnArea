@@ -1,4 +1,4 @@
-## Predict the Burned Area of Forest Fire
+# Predict the Burned Area of Forest Fire
 
 # INTRODUCTION
 
@@ -11,7 +11,7 @@ Forest fire also known as wild fire which can spread quickly in a short time is 
 3.	Total observations: 517
 4.	Variables: 13
 
-# Variable	Description
+## Variable	Description
 
 X: x-axis spatial coordinate within the Montesinho park map: 1 to 9
 Y: y-axis spatial coordinate within the Montesinho park map: 2 to 9
@@ -31,11 +31,11 @@ area: the burned area of the forest (in ha): 0.00 to 1090.84
 
 The objective is to use meteorological data from 2000 to 2003 to predict burn area. I pre-processed and feature engineered the dataset and got a total of 36 independent variables as inputs to improve the performance machine learning and better predict the outcome variable (burn area).  I adopted RSME (Root Mean Square Error) to test the performance of 3 machine learning models
 
-# Pre-processing
+## Pre-processing
 
 When observing the burned area, I noticed that most of them distributed close to zero. So, I applied a log base 10 transform to the burn area to reduce skewness and improve symmetry. I also did centering and removed 9 near zero variance features. 
 
-# Feature Engineering
+## Feature Engineering
 
 I made hypotheses that fires are more likely occur on weekends and affect by seasons.  As we see from figure 3, burn areas tend to be larger during the weekends than the weekdays. Figure 4 indicates that forest fire burn area does have seasonality. I introduced 2 new variables: “is_weekend” and “season” into the dataset and converted these categorical variables into binary features. 
 
