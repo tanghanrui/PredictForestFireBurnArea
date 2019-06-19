@@ -40,6 +40,10 @@ rain: outside rain in mm/m2: 0.0 to 6.4
 
 area: the burned area of the forest (in ha): 0.00 to 1090.84
 
+![image](https://user-images.githubusercontent.com/18519663/58214788-dbc6c700-7cab-11e9-8e56-53a7455e24c7.png)
+
+![image](https://user-images.githubusercontent.com/18519663/58215793-6dd0ce80-7cb0-11e9-8175-adc95d8cecaa.png)
+
 # METHOD AND VARIABLE SELECTION
 
 The objective is to use meteorological data from 2000 to 2003 to predict burn area. I pre-processed and feature engineered the dataset and got a total of 36 independent variables as inputs to improve the performance machine learning and better predict the outcome variable (burn area).  I adopted RSME (Root Mean Square Error) to test the performance of 3 machine learning models
@@ -52,10 +56,17 @@ When observing the burned area, I noticed that most of them distributed close to
 
 I made hypotheses that fires are more likely occur on weekends and affect by seasons.  As we see from figure 3, burn areas tend to be larger during the weekends than the weekdays. Figure 4 indicates that forest fire burn area does have seasonality. I introduced 2 new variables: “is_weekend” and “season” into the dataset and converted these categorical variables into binary features. 
 
+![image](https://user-images.githubusercontent.com/18519663/58215809-79bc9080-7cb0-11e9-99ff-dd39069bb77e.png)
+
+![image](https://user-images.githubusercontent.com/18519663/58215816-7f19db00-7cb0-11e9-8639-10230a788d8a.png)
+
 I split the processed datasets into training and testing parts and applied the following regression model. Lasso model is the final model which has the lowest RMSE (Root Mean Square Error) of 0.6113552
 1.	Forward regression
 2.	Ridge regression
 3.	Lasso regression
+
+![image](https://user-images.githubusercontent.com/18519663/58215820-83de8f00-7cb0-11e9-90c4-50df10fa371c.png)
+![image](https://user-images.githubusercontent.com/18519663/58215825-880aac80-7cb0-11e9-9f95-d8421acdf0e6.png)
 
 # CONCLUSION AND RECOMMENDATIONS
 
